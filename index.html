@@ -1923,18 +1923,21 @@ SMU00106-SMU00084       SMUP0001        Sumatera
 })();
 
 // ==========================================================
-// TAMBAHAN: AUTO-FETCH DATA DARI GITHUB
-// Kode ini tidak merubah script/formula yang sudah ada.
-// Hanya menarik file dari GitHub dan memasukkannya ke input.
+// TAMBAHAN: AUTO-FETCH DATA DARI GOOGLE SHEETS (GOOGLE DRIVE)
+// Kode ini menarik file .xlsx langsung dari Google Sheets
 // ==========================================================
 (function() {
-    async function loadFromGithub() {
-        // Gunakan raw URL dari GitHub agar bisa di-fetch oleh javascript
-        const githubRawUrl = 'https://raw.githubusercontent.com/IwayGH/MW-Performance-Summary-Report/main/Daily%20Tracker%20MW.xlsx';
+    async function loadFromGoogleSheets() {
+        // Ekstrak ID Spreadsheet dan GID dari URL Google Sheets Anda
+        const sheetId = '19cFmUtA_BP16Cgck4-25avMAyxlMuDJQrxITgEDE7jQ';
+        const gid = '720718926';
+        
+        // URL ini akan meminta Google Sheets untuk mengekspor sheet tersebut sebagai file .xlsx
+        const googleSheetExportUrl = `https://docs.google.com/spreadsheets/d/${sheetId}/export?format=xlsx&gid=${gid}`;
         
         try {
-            console.log("Memuat data otomatis dari GitHub...");
-            const response = await fetch(githubRawUrl);
+            console.log("Memuat data otomatis dari Google Sheets...");
+            const response = await fetch(googleSheetExportUrl);
             
             if (!response.ok) {
                 throw new Error('Gagal mengunduh file (Status: ' + response.status + ')');
@@ -1943,8 +1946,8 @@ SMU00106-SMU00084       SMUP0001        Sumatera
             // Ubah response menjadi Blob (file binary)
             const blob = await response.blob();
             
-            // Buat objek File dari blob agar bisa dimasukkan ke input
-            const fileName = "Daily Tracker MW.xlsx";
+            // Buat objek File dari blob agar bisa dimasukkan ke input file
+            const fileName = "Data Performa Google Sheets.xlsx";
             const file = new File([blob], fileName, { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
             
             // Masukkan file hasil fetch ke dalam elemen input file HTML
@@ -1953,18 +1956,20 @@ SMU00106-SMU00084       SMUP0001        Sumatera
             const fileInput = document.getElementById('fileInput');
             fileInput.files = dataTransfer.files;
             
-            // Trigger event 'change' secara buatan agar script asli (XLSX parser) otomatis jalan
+            // Trigger event 'change' secara buatan agar script parser XLSX otomatis jalan
             const event = new Event('change', { bubbles: true });
             fileInput.dispatchEvent(event);
             
+            console.log("Data Google Sheets berhasil dimuat!");
+            
         } catch (error) {
-            console.error('Error loading GitHub data:', error);
-            alert('Gagal memuat data otomatis dari GitHub. Anda masih bisa upload manual. \nDetail Error: ' + error.message);
+            console.error('Error loading Google Sheets data:', error);
+            alert('Gagal memuat data otomatis dari Google Sheets. Pastikan izin akses spreadsheet adalah "Anyone with the link".\nAnda masih bisa upload manual. \nDetail Error: ' + error.message);
         }
     }
 
     // Jalankan fungsi fetch otomatis saat halaman selesai dimuat
-    window.addEventListener('load', loadFromGithub);
+    window.addEventListener('load', loadFromGoogleSheets);
 })();
 
 </script>
