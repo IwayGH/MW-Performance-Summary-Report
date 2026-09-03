@@ -1843,16 +1843,23 @@ SMU00106-SMU00084        SMUP0001        Sumatera        100.5.64.177
     var IDU_NEC_REGIONS = ['Sulawesi', 'Natuna'];
     var IP20_REGIONS = ['Kalimantan', 'Sumatera', 'NTT', 'Maluku'];
 
-    // Bangun mapping node -> region dari rawData yang sudah ada
+        // Bangun mapping node -> region dari rawData yang sudah ada
     var nodeRegionMap = {};
     rawData.trim().split('\n').forEach(function(line) {
         var parts = line.trim().split(/\s+/);
         if (parts.length >= 3) {
-            var node1 = parts[0];
-            var node2 = parts[1];
-            var region = parts[parts.length - 1];
-            if (!nodeRegionMap[node1]) nodeRegionMap[node1] = region;
-            if (!nodeRegionMap[node2]) nodeRegionMap[node2] = region;
+            // Bagian link sekarang ada di parts[0] dan perlu dipisah oleh tanda "-"
+            var link = parts[0]; 
+            var region = parts[2]; // Region sekarang ada di index ke-2 (tetap)
+            
+            var dashIdx = link.indexOf('-');
+            if (dashIdx !== -1) {
+                var node1 = link.substring(0, dashIdx);
+                var node2 = link.substring(dashIdx + 1);
+                
+                if (!nodeRegionMap[node1]) nodeRegionMap[node1] = region;
+                if (!nodeRegionMap[node2]) nodeRegionMap[node2] = region;
+            }
         }
     });
 
