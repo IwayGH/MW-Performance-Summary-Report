@@ -122,6 +122,35 @@
     font-weight: bold;
 }
 
+/* --- CSS untuk Dashboard MW --- */
+#dashboard-overlay {
+    position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+    background: #f4f6f9; z-index: 5; overflow-y: auto; display: none;
+}
+#dash-header {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 15px 20px; background: #fff; border-bottom: 1px solid #ddd;
+    position: sticky; top: 0; z-index: 10; box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+}
+#dash-header h2 { margin: 0; font-size: 18px; color: #2c3e50; }
+#dash-controls { display: flex; gap: 10px; align-items: center; font-size: 12px; }
+#dash-controls input[type="date"] { padding: 5px; border: 1px solid #ccc; border-radius: 4px; }
+#dash-controls button { padding: 6px 12px; border: none; border-radius: 4px; cursor: pointer; color: #fff; font-size: 12px; }
+#dash-apply-btn { background: #3498db; }
+#dash-close-btn { background: #e74c3c; }
+#week-info { font-weight: bold; color: #2c3e50; background: #eef2f7; padding: 6px 12px; border-radius: 12px; }
+
+#dashboard-content {
+    padding: 20px;
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(450px, 1fr)); gap: 20px;
+}
+.dash-card { background: #fff; border-radius: 8px; padding: 15px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); border: 1px solid #eee; }
+.dash-card h3 { margin-top: 0; font-size: 14px; color: #2c3e50; border-bottom: 2px solid #f0f0f0; padding-bottom: 8px; margin-bottom: 15px; }
+.dash-stat-row { display: flex; justify-content: space-around; margin-bottom: 20px; text-align: center; }
+.dash-stat-item .val { font-size: 28px; font-weight: bold; color: #3498db; }
+.dash-stat-item .lbl { font-size: 12px; color: #666; text-transform: uppercase; margin-top: 5px; }
+.dash-chart-container { height: 250px; position: relative; }
+        
     </style>
 </head>
 <body>
@@ -169,14 +198,20 @@
             <div id="summary-container"></div>
             <div id="charts-container"></div>
         </div>
-        <div id="mynetwork"></div>
-
-        <!-- TAMBAHAN: Container untuk Dashboard MW -->
-        <div id="dashboard-view" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: #fff; padding: 25px; overflow-y: auto; display: none; z-index: 5; box-sizing: border-box;">
-            <h2 id="dashboard-title" style="margin-top: 0; color: #2c3e50; border-bottom: 2px solid #2c3e50; padding-bottom: 10px; font-size: 18px;">Dashboard MW</h2>
-            <div id="dashboard-content" style="padding-top: 15px;"></div>
+        <div id="dashboard-overlay">
+            <div id="dash-header">
+                <h2 id="dashboard-title">Dashboard MW</h2>
+                <div id="dash-controls">
+                    <span id="week-info">Week: -</span>
+                    <label>Start:</label>
+                    <input type="date" id="dashStartDate">
+                    <label>End:</label>
+                    <input type="date" id="dashEndDate">
+                    <button id="dash-apply-btn" onclick="showDashboard(currentDashPaket, currentDashRegions)">Apply</button>
+                    <button id="dash-close-btn" onclick="closeDashboard()">✖ Close</button>
         </div>
     </div>
+    <div id="dashboard-content"></div>
 </div>
 
 <script type="text/javascript">
@@ -1401,7 +1436,7 @@ SMU00106-SMU00084        SMUP0001        Sumatera        100.5.64.177
     // ---------------------------------------------------------
     const menuContainer = document.getElementById('menu-container');
 
-        function renderSidebar() {
+    function renderSidebar() {
         menuContainer.innerHTML = '';
         Object.keys(regionMap).sort().forEach(region => {
             const regionDiv = document.createElement('div');
@@ -1421,12 +1456,7 @@ SMU00106-SMU00084        SMUP0001        Sumatera        100.5.64.177
                     e.stopPropagation();
                     document.querySelectorAll('.poi-list li').forEach(l => l.classList.remove('active'));
                     li.classList.add('active');
-                    
-                    // TAMBAHAN: Sembunyikan dashboard saat topologi diklik
-                    document.getElementById('dashboard-view').style.display = 'none';
-                    document.getElementById('mynetwork').style.display = 'block';
-                    
-                    loadTopology(poi, region, null); // Kirim null untuk focusNode
+                    loadTopology(poi, region, null);
                 };
                 poiList.appendChild(li);
             });
@@ -1440,6 +1470,55 @@ SMU00106-SMU00084        SMUP0001        Sumatera        100.5.64.177
             regionDiv.appendChild(poiList);
             menuContainer.appendChild(regionDiv);
         });
+
+        // TAMBAHAN: Menu Dashboard di bawah list Region
+        const dashDiv = document.createElement('div');
+        dashDiv.className = 'region-item';
+        dashDiv.style.marginTop = '20px';
+        dashDiv.style.borderTop = '2px solid #2c3e50';
+        
+        const dashHeader = document.createElement('div');
+        dashHeader.className = 'region-header active';
+        dashHeader.style.background = '#2c3e50';
+        dashHeader.style.color = 'white';
+        dashHeader.innerHTML = '📊 Dashboard MW <span class="arrow">&#9660;</span>';
+        dashHeader.style.cursor = 'pointer';
+        
+        const dashList = document.createElement('ul');
+        dashList.className = 'poi-list show';
+        dashList.style.display = 'block';
+        dashList.style.background = '#fff';
+        
+        const menus = [
+            { name: 'Dashboard Utama', paket: 'Main', regions: [] },
+            { name: 'Paket 1 (Sumatera & Natuna)', paket: 'Paket 1', regions: ['Sumatera', 'Natuna'] },
+            { name: 'Paket 3 (NTT)', paket: 'Paket 3', regions: ['NTT'] },
+            { name: 'Paket 5 (Kalimantan)', paket: 'Paket 5', regions: ['Kalimantan'] },
+            { name: 'Paket 7 (Sulawesi)', paket: 'Paket 7', regions: ['Sulawesi'] },
+            { name: 'Paket 9 (Maluku)', paket: 'Paket 9', regions: ['Maluku'] }
+        ];
+        
+        menus.forEach(m => {
+            const li = document.createElement('li');
+            li.textContent = m.name;
+            li.style.borderLeft = 'none';
+            li.style.fontWeight = 'bold';
+            li.onclick = (e) => {
+                e.stopPropagation();
+                showDashboard(m.paket, m.regions);
+            };
+            dashList.appendChild(li);
+        });
+        
+        dashHeader.onclick = () => {
+            dashList.classList.toggle('show');
+            dashList.style.display = dashList.classList.contains('show') ? 'block' : 'none';
+        };
+        
+        dashDiv.appendChild(dashHeader);
+        dashDiv.appendChild(dashList);
+        menuContainer.appendChild(dashDiv);
+    });
 
         // TAMBAHAN: Menu Dashboard di bawah list region
         const dashDiv = document.createElement('div');
@@ -2236,6 +2315,266 @@ function loadDashboard(type, el) {
     window.addEventListener('load', loadFromGoogleSheets);
 })();
 
+// ==========================================================
+// LOGIKA DASHBOARD MW
+// ==========================================================
+let currentDashPaket = 'Main';
+let currentDashRegions = [];
+let dashCharts = [];
+
+function getWeekNumber(d) {
+    d = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+    d.setUTCDate(d.getUTCDate() + 4 - (d.getUTCDay()||7));
+    var yearStart = new Date(Date.UTC(d.getUTCFullYear(),0,1));
+    var weekNo = Math.ceil((((d - yearStart) / 86400000) + 1)/7);
+    return weekNo;
+}
+
+function showDashboard(paket, regions = []) {
+    currentDashPaket = paket;
+    currentDashRegions = regions;
+    
+    document.getElementById('mynetwork').style.display = 'none';
+    document.getElementById('detail-panel').classList.remove('active');
+    document.getElementById('dashboard-overlay').style.display = 'block';
+    
+    const dashContent = document.getElementById('dashboard-content');
+    dashContent.innerHTML = '';
+    destroyDashCharts();
+    
+    const startVal = document.getElementById('dashStartDate').value;
+    const endVal = document.getElementById('dashEndDate').value;
+    
+    const sDate = startVal ? new Date(startVal) : new Date(Date.now() - 6 * 24 * 60 * 60 * 1000);
+    const eDate = endVal ? new Date(endVal) : new Date();
+    
+    document.getElementById('dashStartDate').value = sDate.toISOString().split('T')[0];
+    document.getElementById('dashEndDate').value = eDate.toISOString().split('T')[0];
+    
+    const sStr = sDate.toISOString().split('T')[0];
+    const eStr = eDate.toISOString().split('T')[0];
+    document.getElementById('dashboard-title').textContent = `Dashboard MW - ${paket}`;
+    document.getElementById('week-info').textContent = `Periode: ${sStr} s/d ${eStr} (Week ${getWeekNumber(eDate)})`;
+    
+    if (paket === 'Main') {
+        renderMainDashboard(sDate, eDate);
+    } else {
+        renderRegionDashboard(paket, regions, sDate, eDate);
+    }
+}
+
+function closeDashboard() {
+    document.getElementById('mynetwork').style.display = 'block';
+    document.getElementById('dashboard-overlay').style.display = 'none';
+    destroyDashCharts();
+}
+
+function destroyDashCharts() {
+    dashCharts.forEach(c => c.destroy());
+    dashCharts = [];
+}
+
+function renderMainDashboard(sDate, eDate) {
+    const content = document.getElementById('dashboard-content');
+    
+    let totalPoi = Object.keys(poiToNodes).length;
+    let totalLinks = 0;
+    let rslCat = { 'Optimal': 0, 'Minor': 0, 'Observes': 0, 'Action TS': 0 };
+    let totalCapDesign = 0, totalCapActual = 0, sumUtil = 0, utilCount = 0;
+    
+    const uniqueLinks = new Set();
+    Object.keys(linkToIp).forEach(link => {
+        const p = link.split('-');
+        uniqueLinks.add(p[0] < p[1] ? `${p[0]}-${p[1]}` : `${p[1]}-${p[0]}`);
+    });
+    totalLinks = uniqueLinks.size;
+    
+    uniqueLinks.forEach(linkId => {
+        const perf = performanceData[linkId] || performanceData[`${linkId.split('-')[1]}-${linkId.split('-')[0]}`];
+        if (perf) {
+            const filtered = perf.filter(d => {
+                if(!d.date) return false;
+                const dDate = new Date(d.date);
+                return dDate >= sDate && dDate <= eDate;
+            });
+            
+            if (filtered.length > 0) {
+                const validRsl = filtered.filter(d => !isNaN(d.rsl)).map(d => d.rsl);
+                if (validRsl.length > 0) {
+                    const maxRsl = Math.max(...validRsl);
+                    if (maxRsl >= -3) rslCat['Optimal']++;
+                    else if (maxRsl >= -6) rslCat['Minor']++;
+                    else if (maxRsl >= -10) rslCat['Observes']++;
+                    else rslCat['Action TS']++;
+                }
+                const validCap = filtered.filter(d => !isNaN(d.cap)).map(d => d.cap);
+                if (validCap.length > 0) totalCapActual += Math.max(...validCap);
+                
+                const validUtil = filtered.filter(d => !isNaN(d.util)).map(d => d.util);
+                if (validUtil.length > 0) {
+                    sumUtil += Math.max(...validUtil);
+                    utilCount++;
+                }
+            }
+            const capDesignRec = perf.find(d => !isNaN(d.capDesign));
+            if (capDesignRec) totalCapDesign += capDesignRec.capDesign;
+        }
+    });
+    
+    const avgUtil = utilCount > 0 ? sumUtil / utilCount : 0;
+
+    // Card 1: Table Total
+    content.innerHTML += `
+        <div class="dash-card">
+            <h3>Summary Total</h3>
+            <div class="dash-stat-row">
+                <div class="dash-stat-item"><div class="val">${totalPoi}</div><div class="lbl">Total POI</div></div>
+                <div class="dash-stat-item"><div class="val">${totalLinks}</div><div class="lbl">Total Link</div></div>
+            </div>
+        </div>
+    `;
+    
+    // Card 2: Donut RSL
+    content.innerHTML += `
+        <div class="dash-card">
+            <h3>Total Performance RSL</h3>
+            <div class="dash-chart-container"><canvas id="dashRslChart"></canvas></div>
+        </div>
+    `;
+    dashCharts.push(new Chart(document.getElementById('dashRslChart').getContext('2d'), {
+        type: 'doughnut',
+        data: { labels: Object.keys(rslCat), datasets: [{ data: Object.values(rslCat), backgroundColor: ['#27ae60', '#00bcd4', '#f1c40f', '#e74c3c'] }] },
+        options: { plugins: { datalabels: { color: '#fff', font: { weight: 'bold' }, formatter: (v) => v > 0 ? v : '' } }, legend: { position: 'bottom' } }
+    }));
+
+    // Card 3: Combo Cap Design vs Actual & Util
+    content.innerHTML += `
+        <div class="dash-card">
+            <h3>Capacity Design vs Actual & Utilization</h3>
+            <div class="dash-chart-container"><canvas id="dashCapChart"></canvas></div>
+        </div>
+    `;
+    dashCharts.push(new Chart(document.getElementById('dashCapChart').getContext('2d'), {
+        type: 'bar',
+        data: { labels: ['Total'], datasets: [
+            { label: 'Cap Design (Mbps)', data: [totalCapDesign], backgroundColor: '#3498db', yAxisID: 'y' },
+            { label: 'Cap Actual (Mbps)', data: [totalCapActual], backgroundColor: '#27ae60', yAxisID: 'y' },
+            { label: 'Utilization (%)', data: [avgUtil], type: 'line', borderColor: '#e74c3c', backgroundColor: '#e74c3c', yAxisID: 'y1', tension: 0.1 }
+        ]},
+        options: { scales: { y: { position: 'left', title: { display: true, text: 'Mbps' } }, y1: { position: 'right', title: { display: true, text: '%' }, grid: { drawOnChartArea: false }, min: 0, max: 100 } }, plugins: { datalabels: { anchor: 'end', align: 'top', font: { size: 10 } } } }
+    }));
+}
+
+function renderRegionDashboard(paket, regions, sDate, eDate) {
+    const content = document.getElementById('dashboard-content');
+    let totalPoi = 0, totalLinks = 0;
+    let poiData = {};
+    
+    regions.forEach(r => {
+        if (regionMap[r]) {
+            totalPoi += regionMap[r].size;
+            regionMap[r].forEach(p => { poiData[p] = { maxUtil: [], aveUtil: [], capDesign: 0, capActual: 0 }; });
+        }
+    });
+    
+    const uniqueLinks = new Set();
+    Object.keys(linkToIp).forEach(link => {
+        const p = link.split('-');
+        uniqueLinks.add(p[0] < p[1] ? `${p[0]}-${p[1]}` : `${p[1]}-${p[0]}`);
+    });
+    
+    uniqueLinks.forEach(linkId => {
+        const [id1, id2] = linkId.split('-');
+        const poi1 = nodeToPoi[id1], poi2 = nodeToPoi[id2];
+        const reg1 = nodeData[id1] ? nodeData[id1].region : null;
+        const reg2 = nodeData[id2] ? nodeData[id2].region : null;
+        
+        if (regions.includes(reg1) || regions.includes(reg2)) {
+            totalLinks++;
+            const perf = performanceData[linkId] || performanceData[`${id2}-${id1}`];
+            if (perf) {
+                const filtered = perf.filter(d => {
+                    if(!d.date) return false;
+                    const dDate = new Date(d.date);
+                    return dDate >= sDate && dDate <= eDate;
+                });
+                
+                let linkMaxUtil = NaN, linkAveUtil = NaN, linkCapDesign = NaN, linkCapActual = NaN;
+                
+                if (filtered.length > 0) {
+                    const validUtil = filtered.filter(d => !isNaN(d.util)).map(d => d.util);
+                    if (validUtil.length > 0) {
+                        linkMaxUtil = Math.max(...validUtil);
+                        linkAveUtil = validUtil.reduce((a,b) => a+b, 0) / validUtil.length;
+                    }
+                    const validCap = filtered.filter(d => !isNaN(d.cap)).map(d => d.cap);
+                    if (validCap.length > 0) linkCapActual = Math.max(...validCap);
+                }
+                const capDesignRec = perf.find(d => !isNaN(d.capDesign));
+                if (capDesignRec) linkCapDesign = capDesignRec.capDesign;
+                
+                [poi1, poi2].forEach(p => {
+                    if (poiData[p]) {
+                        if (!isNaN(linkMaxUtil)) poiData[p].maxUtil.push(linkMaxUtil);
+                        if (!isNaN(linkAveUtil)) poiData[p].aveUtil.push(linkAveUtil);
+                        if (!isNaN(linkCapDesign)) poiData[p].capDesign += linkCapDesign;
+                        if (!isNaN(linkCapActual)) poiData[p].capActual += linkCapActual;
+                    }
+                });
+            }
+        }
+    });
+    
+    const poiNames = Object.keys(poiData);
+    const maxUtilData = poiNames.map(p => poiData[p].maxUtil.length ? Math.max(...poiData[p].maxUtil) : 0);
+    const aveUtilData = poiNames.map(p => poiData[p].aveUtil.length ? (poiData[p].aveUtil.reduce((a,b)=>a+b,0)/poiData[p].aveUtil.length) : 0);
+    const capDesData = poiNames.map(p => poiData[p].capDesign);
+    const capActData = poiNames.map(p => poiData[p].capActual);
+
+    // Card 1: Summary Table
+    content.innerHTML += `
+        <div class="dash-card">
+            <h3>Summary ${paket}</h3>
+            <div class="dash-stat-row">
+                <div class="dash-stat-item"><div class="val">${totalPoi}</div><div class="lbl">Total POI</div></div>
+                <div class="dash-stat-item"><div class="val">${totalLinks}</div><div class="lbl">Total Link</div></div>
+            </div>
+        </div>
+    `;
+    
+    // Card 2: Utilization Max & Ave per POI
+    content.innerHTML += `
+        <div class="dash-card">
+            <h3>Total Utilization Capacity Usage (%)</h3>
+            <div class="dash-chart-container"><canvas id="dashUtilChart"></canvas></div>
+        </div>
+    `;
+    dashCharts.push(new Chart(document.getElementById('dashUtilChart').getContext('2d'), {
+        type: 'bar',
+        data: { labels: poiNames, datasets: [
+            { label: 'Max Util (%)', data: maxUtilData, backgroundColor: '#3498db' },
+            { label: 'Ave Util (%)', data: aveUtilData, backgroundColor: '#95a5a6' }
+        ]},
+        options: { scales: { y: { min: 0, max: 100 } }, plugins: { datalabels: { anchor: 'end', align: 'top', font: { size: 9 }, formatter: (v) => v > 0 ? v.toFixed(1)+'%' : '' } }, legend: { position: 'bottom' } } }
+    }));
+
+    // Card 3: Capacity Design vs Usage per POI
+    content.innerHTML += `
+        <div class="dash-card">
+            <h3>Total Capacity Design vs Usage Capacity</h3>
+            <div class="dash-chart-container"><canvas id="dashCapSumChart"></canvas></div>
+        </div>
+    `;
+    dashCharts.push(new Chart(document.getElementById('dashCapSumChart').getContext('2d'), {
+        type: 'bar',
+        data: { labels: poiNames, datasets: [
+            { label: 'Cap Design (Mbps)', data: capDesData, backgroundColor: '#3498db' },
+            { label: 'Cap Actual (Mbps)', data: capActData, backgroundColor: '#27ae60' }
+        ]},
+        options: { plugins: { datalabels: { anchor: 'end', align: 'top', font: { size: 9 }, formatter: (v) => v > 0 ? v.toFixed(0) : '' } }, legend: { position: 'bottom' } } }
+    }));
+}
+    
 </script>
 
 </body></html>
