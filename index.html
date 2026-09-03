@@ -1711,7 +1711,10 @@ SMU00106-SMU00084        SMUP0001        Sumatera        100.5.64.177
 
     function showLinkDetails(edgeId) {
         detailPanel.classList.add('active');
-        detailTitle.textContent = `Link: ${edgeId}`;
+        // TAMBAHAN: Ambil IP Address dari map linkToIp
+        let ipAddress = linkToIp[edgeId] || linkToIp[`${edgeId.split('-')[1]}-${edgeId.split('-')[0]}`] || 'N/A';
+        // Tampilkan IP Address di sebelah kanan Link:
+        detailTitle.textContent = `Link: ${edgeId} | IP Address: ${ipAddress}`;
         destroyCharts();
 
         const perf = performanceData[edgeId] || performanceData[`${edgeId.split('-')[1]}-${edgeId.split('-')[0]}`];
