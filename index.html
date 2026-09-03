@@ -1714,7 +1714,7 @@ SMU00106-SMU00084        SMUP0001        Sumatera        100.5.64.177
         // TAMBAHAN: Ambil IP Address dari map linkToIp
         let ipAddress = linkToIp[edgeId] || linkToIp[`${edgeId.split('-')[1]}-${edgeId.split('-')[0]}`] || 'N/A';
         // Tampilkan IP Address di sebelah kanan Link:
-        detailTitle.textContent = `Link: ${edgeId} | IP Address: ${ipAddress}`;
+        detailTitle.textContent = `Link: ${edgeId} | ${ipAddress}`;
         destroyCharts();
 
         const perf = performanceData[edgeId] || performanceData[`${edgeId.split('-')[1]}-${edgeId.split('-')[0]}`];
