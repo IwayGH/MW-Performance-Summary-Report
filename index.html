@@ -107,6 +107,8 @@
         .dash-stat-item .val { font-size: 28px; font-weight: bold; color: #3498db; }
         .dash-stat-item .lbl { font-size: 12px; color: #666; text-transform: uppercase; margin-top: 5px; }
         .dash-chart-container { height: 250px; position: relative; }
+        
+        #fetch-status { font-size: 11px; padding: 8px; margin-top: 5px; text-align: center; border-radius: 4px; background: #f8f9fa; font-weight: bold; }
     </style>
 </head>
 <body>
@@ -133,6 +135,7 @@
                 <label>Cari Site ID (Node)</label>
                 <input type="text" id="siteSearch" placeholder="Ketik Site ID (misal: KEP0017)" onkeyup="searchSite()">
             </div>
+            <div id="fetch-status"></div>
         </div>
         <div id="menu-container"></div>
         <div id="legend">
@@ -1267,71 +1270,79 @@ SMU00106-SMU00084        SMUP0001        Sumatera        100.5.64.177
         if (!file) return;
         const reader = new FileReader();
         reader.onload = (e) => {
-            const data = new Uint8Array(e.target.result);
-            const workbook = XLSX.read(data, { type: 'array' });
-            const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
-            const jsonData = XLSX.utils.sheet_to_json(firstSheet, { header: 1 }); 
-            const headers = jsonData[0];
-            const rows = jsonData.slice(1);
-            let tempData = {};
-            let foundCount = 0;
-            const linkIdx = headers.findIndex(h => String(h).toLowerCase().includes('link'));
-            const dateIdx = headers.findIndex(h => String(h).toLowerCase().includes('date'));
-            const rslIdx = headers.findIndex(h => String(h).toLowerCase() === 'rsl_dbm' || (String(h).toLowerCase().includes('rsl') && String(h).toLowerCase().includes('dbm')));
-            const capIdx = headers.findIndex(h => String(h).toLowerCase().includes('cap') && !String(h).toLowerCase().includes('design'));
-            const availIdx = headers.findIndex(h => String(h).toLowerCase().includes('avail'));
-            const utilIdx = headers.findIndex(h => String(h).toLowerCase().includes('utilization') || String(h).toLowerCase().includes('util'));
-            let downlinkIdx = headers.findIndex(h => String(h).toLowerCase().includes('downlink') || String(h).toLowerCase().includes('total'));
-            const bwIdx = headers.findIndex(h => String(h).toLowerCase().includes('bandwidth'));
-            const modIdx = headers.findIndex(h => String(h).toLowerCase().includes('modulation'));
-            const confIdx = headers.findIndex(h => String(h).toLowerCase().includes('configuration'));
-            const rslDesignIdx = headers.findIndex(h => String(h).toLowerCase().includes('design') && String(h).toLowerCase().includes('rsl'));
-            const capDesignIdx = headers.findIndex(h => String(h).toLowerCase().includes('capacity') && String(h).toLowerCase().includes('design'));
-            if(rslIdx === -1) alert("Kolom 'RSL_dBm' tidak ditemukan!");
-            rows.forEach(row => {
-                let rawLinkId = linkIdx !== -1 ? String(row[linkIdx]).trim() : null;
-                let linkId = normalizeLinkId(rawLinkId);
-                if (!linkId || !linkId.includes('-')) {
-                     if(rawLinkId && rawLinkId.includes('-')) linkId = rawLinkId; 
-                }
-                if (linkId && linkId.includes('-')) {
-                    if (!tempData[linkId]) tempData[linkId] = [];
-                    let dateVal = dateIdx !== -1 ? row[dateIdx] : null;
-                    if (typeof dateVal === 'number') {
-                         const utc_days = Math.floor(dateVal - 25569);
-                         const utc_value = utc_days * 86400;
-                         dateVal = new Date(utc_value * 1000).toISOString().split('T')[0];
-                    } else {
-                        dateVal = String(dateVal);
+            try {
+                const data = new Uint8Array(e.target.result);
+                const workbook = XLSX.read(data, { type: 'array' });
+                const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+                const jsonData = XLSX.utils.sheet_to_json(firstSheet, { header: 1 }); 
+                const headers = jsonData[0];
+                const rows = jsonData.slice(1);
+                let tempData = {};
+                let foundCount = 0;
+                const linkIdx = headers.findIndex(h => String(h).toLowerCase().includes('link'));
+                const dateIdx = headers.findIndex(h => String(h).toLowerCase().includes('date'));
+                const rslIdx = headers.findIndex(h => String(h).toLowerCase() === 'rsl_dbm' || (String(h).toLowerCase().includes('rsl') && String(h).toLowerCase().includes('dbm')));
+                const capIdx = headers.findIndex(h => String(h).toLowerCase().includes('cap') && !String(h).toLowerCase().includes('design'));
+                const availIdx = headers.findIndex(h => String(h).toLowerCase().includes('avail'));
+                const utilIdx = headers.findIndex(h => String(h).toLowerCase().includes('utilization') || String(h).toLowerCase().includes('util'));
+                let downlinkIdx = headers.findIndex(h => String(h).toLowerCase().includes('downlink') || String(h).toLowerCase().includes('total'));
+                const bwIdx = headers.findIndex(h => String(h).toLowerCase().includes('bandwidth'));
+                const modIdx = headers.findIndex(h => String(h).toLowerCase().includes('modulation'));
+                const confIdx = headers.findIndex(h => String(h).toLowerCase().includes('configuration'));
+                const rslDesignIdx = headers.findIndex(h => String(h).toLowerCase().includes('design') && String(h).toLowerCase().includes('rsl'));
+                const capDesignIdx = headers.findIndex(h => String(h).toLowerCase().includes('capacity') && String(h).toLowerCase().includes('design'));
+                if(rslIdx === -1) alert("Kolom 'RSL_dBm' tidak ditemukan!");
+                rows.forEach(row => {
+                    let rawLinkId = linkIdx !== -1 ? String(row[linkIdx]).trim() : null;
+                    let linkId = normalizeLinkId(rawLinkId);
+                    if (!linkId || !linkId.includes('-')) {
+                         if(rawLinkId && rawLinkId.includes('-')) linkId = rawLinkId; 
                     }
-                    let rslVal = cleanParseFloat(row[rslIdx]);
-                    let capVal = cleanParseFloat(row[capIdx]);
-                    let availVal = cleanParseFloat(row[availIdx]);
-                    let utilVal = utilIdx !== -1 ? cleanParseFloat(row[utilIdx]) : NaN;
-                    let downlinkVal = cleanParseFloat(row[downlinkIdx]); 
-                    let bwVal = bwIdx !== -1 ? row[bwIdx] : null;
-                    let modVal = modIdx !== -1 ? row[modIdx] : null;
-                    let confVal = confIdx !== -1 ? row[confIdx] : null;
-                    let rslDesignVal = cleanParseFloat(row[rslDesignIdx]);
-                    let capDesignVal = cleanParseFloat(row[capDesignIdx]);
-                    if(String(bwVal).includes('#N/A') || String(bwVal).includes('#VALUE!')) bwVal = 'N/A';
-                    if(String(modVal).includes('#N/A') || String(modVal).includes('#VALUE!')) modVal = 'N/A';
-                    if(String(confVal).includes('#N/A') || String(confVal).includes('#VALUE!')) confVal = 'N/A';
-                    if (!isNaN(availVal) && availVal <= 1 && availVal >= 0) availVal = availVal * 100;
-                    if (!isNaN(utilVal) && utilVal <= 1 && utilVal >= 0) utilVal = utilVal * 100;
-                    tempData[linkId].push({
-                        date: dateVal, rsl: rslVal, cap: capVal, avail: availVal, util: utilVal,
-                        downlink: downlinkVal, bandwidth: bwVal ? String(bwVal) : 'N/A',
-                        modulation: modVal ? String(modVal) : 'N/A',
-                        configuration: confVal ? String(confVal) : 'N/A',
-                        rslDesign: rslDesignVal, capDesign: capDesignVal
-                    });
-                    foundCount++;
-                }
-            });
-            performanceData = tempData;
-            alert(`Sukses! Data loaded: ${Object.keys(performanceData).length} links found with ${foundCount} records.`);
-            applyFilters();
+                    if (linkId && linkId.includes('-')) {
+                        if (!tempData[linkId]) tempData[linkId] = [];
+                        let dateVal = dateIdx !== -1 ? row[dateIdx] : null;
+                        if (typeof dateVal === 'number') {
+                             const utc_days = Math.floor(dateVal - 25569);
+                             const utc_value = utc_days * 86400;
+                             dateVal = new Date(utc_value * 1000).toISOString().split('T')[0];
+                        } else {
+                            dateVal = String(dateVal);
+                        }
+                        let rslVal = cleanParseFloat(row[rslIdx]);
+                        let capVal = cleanParseFloat(row[capIdx]);
+                        let availVal = cleanParseFloat(row[availIdx]);
+                        let utilVal = utilIdx !== -1 ? cleanParseFloat(row[utilIdx]) : NaN;
+                        let downlinkVal = cleanParseFloat(row[downlinkIdx]); 
+                        let bwVal = bwIdx !== -1 ? row[bwIdx] : null;
+                        let modVal = modIdx !== -1 ? row[modIdx] : null;
+                        let confVal = confIdx !== -1 ? row[confIdx] : null;
+                        let rslDesignVal = cleanParseFloat(row[rslDesignIdx]);
+                        let capDesignVal = cleanParseFloat(row[capDesignIdx]);
+                        if(String(bwVal).includes('#N/A') || String(bwVal).includes('#VALUE!')) bwVal = 'N/A';
+                        if(String(modVal).includes('#N/A') || String(modVal).includes('#VALUE!')) modVal = 'N/A';
+                        if(String(confVal).includes('#N/A') || String(confVal).includes('#VALUE!')) confVal = 'N/A';
+                        if (!isNaN(availVal) && availVal <= 1 && availVal >= 0) availVal = availVal * 100;
+                        if (!isNaN(utilVal) && utilVal <= 1 && utilVal >= 0) utilVal = utilVal * 100;
+                        tempData[linkId].push({
+                            date: dateVal, rsl: rslVal, cap: capVal, avail: availVal, util: utilVal,
+                            downlink: downlinkVal, bandwidth: bwVal ? String(bwVal) : 'N/A',
+                            modulation: modVal ? String(modVal) : 'N/A',
+                            configuration: confVal ? String(confVal) : 'N/A',
+                            rslDesign: rslDesignVal, capDesign: capDesignVal
+                        });
+                        foundCount++;
+                    }
+                });
+                performanceData = tempData;
+                const statusEl = document.getElementById('fetch-status');
+                if(statusEl) statusEl.innerHTML = '✅ Data Excel berhasil dimuat: ' + Object.keys(performanceData).length + ' links';
+                applyFilters();
+            } catch (err) {
+                alert('Gagal membaca file. Pastikan format sesuai template Excel.');
+                console.error('XLSX Parse Error:', err);
+                const statusEl = document.getElementById('fetch-status');
+                if(statusEl) statusEl.innerHTML = '⚠️ <span style="color:red;">Format Excel tidak valid</span>';
+            }
         };
         reader.readAsArrayBuffer(file);
     });
@@ -2063,28 +2074,36 @@ function renderRegionDashboard(paket, regions, sDate, eDate) {
 // ==========================================================
 (function() {
     async function loadFromGoogleSheets() {
+        const statusEl = document.getElementById('fetch-status');
         const sheetId = '19cFmUtA_BP16Cgck4-25avMAyxlMuDJQrxITgEDE7jQ';
         const gid = '720718926';
         const googleSheetExportUrl = `https://docs.google.com/spreadsheets/d/${sheetId}/export?format=xlsx&gid=${gid}`;
+        
         try {
-            console.log("Memuat data otomatis dari Google Sheets...");
+            if(statusEl) statusEl.innerHTML = '⏳ Memuat data otomatis dari Google Sheets...';
             const response = await fetch(googleSheetExportUrl);
-            if (!response.ok) {
-                throw new Error('Gagal mengunduh file (Status: ' + response.status + ')');
-            }
+            if (!response.ok) throw new Error('HTTP error ' + response.status);
+            
             const blob = await response.blob();
+            // Cek apakah response adalah HTML (biasanya halaman login Google jika akses ditolak)
+            if (blob.type.includes('text/html')) {
+                throw new Error('Akses ditolak (Halaman Login)');
+            }
+            
             const fileName = "Data Performa Google Sheets.xlsx";
             const file = new File([blob], fileName, { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+            
             const dataTransfer = new DataTransfer();
             dataTransfer.items.add(file);
             const fileInput = document.getElementById('fileInput');
             fileInput.files = dataTransfer.files;
+            
             const event = new Event('change', { bubbles: true });
             fileInput.dispatchEvent(event);
-            console.log("Data Google Sheets berhasil dimuat!");
+            
         } catch (error) {
             console.error('Error loading Google Sheets data:', error);
-            alert('Gagal memuat data otomatis dari Google Sheets. Pastikan izin akses spreadsheet adalah "Anyone with the link".\nAnda masih bisa upload manual. \nDetail Error: ' + error.message);
+            if(statusEl) statusEl.innerHTML = '⚠️ <span style="color:#e74c3c;">Gagal otomatis. Silakan upload manual.</span>';
         }
     }
     window.addEventListener('load', loadFromGoogleSheets);
