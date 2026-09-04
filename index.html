@@ -1203,61 +1203,56 @@ SMU00106-SMU00084        SMUP0001        Sumatera        100.5.64.177
     const nodeData = {}; 
     const nodeToPoi = {}; 
     const poiToNodes = {}; 
-    const linkToIp = {}; // TAMBAHAN: Mapping Link ID -> IP Address
+    const linkToIp = {}; 
     let network = null;
     let performanceData = {}; 
     let chartInstances = [];
 
     lines.forEach(line => {
-    const parts = line.trim().split(/\s+/);
-    if (parts.length < 3) return;
+        const parts = line.trim().split(/\s+/);
+        if (parts.length < 3) return;
 
-    let link = parts[0].trim();
-    const poi = parts[1].trim();
-    const region = parts[2].trim();
-    // TAMBAHAN: Ambil IP Address dari kolom ke-4 (jika ada)
-    const ipAddress = parts.length > 3 ? parts.slice(3).join(' ').trim() : '';
+        let link = parts[0].trim();
+        const poi = parts[1].trim();
+        const region = parts[2].trim();
+        const ipAddress = parts.length > 3 ? parts.slice(3).join(' ').trim() : '';
 
-    link = link.replace('(IB)', '').replace('(IB) ', '').replace(' (IB)', '').trim();
-    const dashIdx = link.indexOf('-');
-    if (dashIdx === -1) return;
+        link = link.replace('(IB)', '').replace('(IB) ', '').replace(' (IB)', '').trim();
+        const dashIdx = link.indexOf('-');
+        if (dashIdx === -1) return;
 
-    const id1 = link.substring(0, dashIdx);
-    const id2 = link.substring(dashIdx + 1);
+        const id1 = link.substring(0, dashIdx);
+        const id2 = link.substring(dashIdx + 1);
 
-    // TAMBAHAN: Simpan IP Address ke map (untuk kedua arah link)
-    if (ipAddress) {
-        linkToIp[link] = ipAddress;
-        linkToIp[`${id2}-${id1}`] = ipAddress;
-    }
+        if (ipAddress) {
+            linkToIp[link] = ipAddress;
+            linkToIp[`${id2}-${id1}`] = ipAddress;
+        }
 
-    if (!graph[id1]) graph[id1] = [];
-    if (!graph[id2]) graph[id2] = [];
-    graph[id1].push(id2);
-    graph[id2].push(id1);
+        if (!graph[id1]) graph[id1] = [];
+        if (!graph[id2]) graph[id2] = [];
+        graph[id1].push(id2);
+        graph[id2].push(id1);
 
-    if (!regionMap[region]) regionMap[region] = new Set();
-    regionMap[region].add(poi);
+        if (!regionMap[region]) regionMap[region] = new Set();
+        regionMap[region].add(poi);
 
-    if (!nodeData[id1]) nodeData[id1] = { id: id1, region: region };
-    if (!nodeData[id2]) nodeData[id2] = { id: id2, region: region };
+        if (!nodeData[id1]) nodeData[id1] = { id: id1, region: region };
+        if (!nodeData[id2]) nodeData[id2] = { id: id2, region: region };
 
-    if (!poiToNodes[poi]) poiToNodes[poi] = new Set();
-    poiToNodes[poi].add(id1);
-    poiToNodes[poi].add(id2);
-    nodeToPoi[id1] = poi;
-    nodeToPoi[id2] = poi;
-});
+        if (!poiToNodes[poi]) poiToNodes[poi] = new Set();
+        poiToNodes[poi].add(id1);
+        poiToNodes[poi].add(id2);
+        nodeToPoi[id1] = poi;
+        nodeToPoi[id2] = poi;
+    });
 
     // ---------------------------------------------------------
     // 3. LOGIC EXCEL
     // ---------------------------------------------------------
-    
     function downloadTemplate() {
         const headers = [["Link_ID", "Date", "RSL_dBm", "Capacity_Mbps", "Availability_%", "Total_Downlink", "Bandwidth", "Modulation", "Configuration", "Capacity Design"]];
-        const sampleData = [
-            ["NTT0067-NTTP0001", "2023-10-01", -65, 100, 99.99, 10, "28M", "128QAM", "Config A", 150]
-        ];
+        const sampleData = [["NTT0067-NTTP0001", "2023-10-01", -65, 100, 99.99, 10, "28M", "128QAM", "Config A", 150]];
         const ws = XLSX.utils.aoa_to_sheet(headers.concat(sampleData));
         const wb = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(wb, ws, "Performance Data");
@@ -1266,10 +1261,7 @@ SMU00106-SMU00084        SMUP0001        Sumatera        100.5.64.177
 
     function cleanParseFloat(val) {
         if (val === null || val === undefined || val === '#N/A' || val === '#VALUE!') return NaN;
-        if (typeof val === 'string' && val.indexOf('%') !== -1) {
-            val = val.replace('%', '');
-            return parseFloat(val);
-        }
+        if (typeof val === 'string' && val.indexOf('%') !== -1) return parseFloat(val.replace('%', ''));
         return parseFloat(val);
     }
 
@@ -1282,7 +1274,6 @@ SMU00106-SMU00084        SMUP0001        Sumatera        100.5.64.177
     document.getElementById('fileInput').addEventListener('change', (e) => {
         const file = e.target.files[0];
         if (!file) return;
-
         const reader = new FileReader();
         reader.onload = (e) => {
             const data = new Uint8Array(e.target.result);
@@ -1292,30 +1283,20 @@ SMU00106-SMU00084        SMUP0001        Sumatera        100.5.64.177
 
             const headers = jsonData[0];
             const rows = jsonData.slice(1);
-
             let tempData = {};
             let foundCount = 0;
 
-            // Cari Index Kolom
             const linkIdx = headers.findIndex(h => String(h).toLowerCase().includes('link'));
             const dateIdx = headers.findIndex(h => String(h).toLowerCase().includes('date'));
-            
-            // RSL_dBm
             const rslIdx = headers.findIndex(h => String(h).toLowerCase() === 'rsl_dbm' || (String(h).toLowerCase().includes('rsl') && String(h).toLowerCase().includes('dbm')));
-            
             const capIdx = headers.findIndex(h => String(h).toLowerCase().includes('cap') && !String(h).toLowerCase().includes('design'));
             const availIdx = headers.findIndex(h => String(h).toLowerCase().includes('avail'));
             const utilIdx = headers.findIndex(h => String(h).toLowerCase().includes('utilization') || String(h).toLowerCase().includes('util'));
-            
-            // Kolom Tambahan
             let downlinkIdx = headers.findIndex(h => String(h).toLowerCase().includes('downlink') || String(h).toLowerCase().includes('total'));
             const bwIdx = headers.findIndex(h => String(h).toLowerCase().includes('bandwidth'));
             const modIdx = headers.findIndex(h => String(h).toLowerCase().includes('modulation'));
             const confIdx = headers.findIndex(h => String(h).toLowerCase().includes('configuration'));
-            
-            // Kolom Design
             const rslDesignIdx = headers.findIndex(h => String(h).toLowerCase().includes('design') && String(h).toLowerCase().includes('rsl'));
-            // FIX: Kapasitas Design - mencari header yang mengandung 'capacity' dan 'design'
             const capDesignIdx = headers.findIndex(h => String(h).toLowerCase().includes('capacity') && String(h).toLowerCase().includes('design'));
 
             if(rslIdx === -1) alert("Kolom 'RSL_dBm' tidak ditemukan! Pastikan header sesuai.");
@@ -1323,67 +1304,43 @@ SMU00106-SMU00084        SMUP0001        Sumatera        100.5.64.177
             rows.forEach(row => {
                 let rawLinkId = linkIdx !== -1 ? String(row[linkIdx]).trim() : null;
                 let linkId = normalizeLinkId(rawLinkId);
-
                 if (!linkId || !linkId.includes('-')) {
                      if(rawLinkId && rawLinkId.includes('-')) linkId = rawLinkId; 
                 }
-
                 if (linkId && linkId.includes('-')) {
                     if (!tempData[linkId]) tempData[linkId] = [];
-                    
                     let dateVal = dateIdx !== -1 ? row[dateIdx] : null;
                     if (typeof dateVal === 'number') {
                          const utc_days = Math.floor(dateVal - 25569);
                          const utc_value = utc_days * 86400;
                          dateVal = new Date(utc_value * 1000).toISOString().split('T')[0];
-                    } else {
-                        dateVal = String(dateVal);
-                    }
+                    } else { dateVal = String(dateVal); }
 
                     let rslVal = cleanParseFloat(row[rslIdx]);
                     let capVal = cleanParseFloat(row[capIdx]);
                     let availVal = cleanParseFloat(row[availIdx]);
                     let utilVal = utilIdx !== -1 ? cleanParseFloat(row[utilIdx]) : NaN;
                     let downlinkVal = cleanParseFloat(row[downlinkIdx]); 
-                    
-                    // Ambil data string
                     let bwVal = bwIdx !== -1 ? row[bwIdx] : null;
                     let modVal = modIdx !== -1 ? row[modIdx] : null;
                     let confVal = confIdx !== -1 ? row[confIdx] : null;
-                    
-                    // Ambil Design Values
                     let rslDesignVal = cleanParseFloat(row[rslDesignIdx]);
                     let capDesignVal = cleanParseFloat(row[capDesignIdx]);
                     
-                    // Handle error values for strings
                     if(String(bwVal).includes('#N/A') || String(bwVal).includes('#VALUE!')) bwVal = 'N/A';
                     if(String(modVal).includes('#N/A') || String(modVal).includes('#VALUE!')) modVal = 'N/A';
                     if(String(confVal).includes('#N/A') || String(confVal).includes('#VALUE!')) confVal = 'N/A';
-
-                    if (!isNaN(availVal) && availVal <= 1 && availVal >= 0) {
-                        availVal = availVal * 100;
-                    }
-                    if (!isNaN(utilVal) && utilVal <= 1 && utilVal >= 0) {
-                        utilVal = utilVal * 100;
-                    }
+                    if (!isNaN(availVal) && availVal <= 1 && availVal >= 0) availVal = availVal * 100;
+                    if (!isNaN(utilVal) && utilVal <= 1 && utilVal >= 0) utilVal = utilVal * 100;
 
                     tempData[linkId].push({
-                        date: dateVal,
-                        rsl: rslVal,
-                        cap: capVal,
-                        avail: availVal,
-                        util: utilVal,
-                        downlink: downlinkVal,
-                        bandwidth: bwVal ? String(bwVal) : 'N/A',
-                        modulation: modVal ? String(modVal) : 'N/A',
-                        configuration: confVal ? String(confVal) : 'N/A',
-                        rslDesign: rslDesignVal,
-                        capDesign: capDesignVal // Tambahkan ke objek
+                        date: dateVal, rsl: rslVal, cap: capVal, avail: availVal, util: utilVal, downlink: downlinkVal,
+                        bandwidth: bwVal ? String(bwVal) : 'N/A', modulation: modVal ? String(modVal) : 'N/A',
+                        configuration: confVal ? String(confVal) : 'N/A', rslDesign: rslDesignVal, capDesign: capDesignVal
                     });
                     foundCount++;
                 }
             });
-            
             performanceData = tempData;
             alert(`Sukses! Data loaded: ${Object.keys(performanceData).length} links found with ${foundCount} records.`);
             applyFilters();
@@ -1406,11 +1363,9 @@ SMU00106-SMU00084        SMUP0001        Sumatera        100.5.64.177
         Object.keys(regionMap).sort().forEach(region => {
             const regionDiv = document.createElement('div');
             regionDiv.className = 'region-item';
-            
             const header = document.createElement('div');
             header.className = 'region-header';
             header.innerHTML = `${region} <span class="arrow">&#9654;</span>`;
-            
             const poiList = document.createElement('ul');
             poiList.className = 'poi-list';
             
@@ -1421,20 +1376,66 @@ SMU00106-SMU00084        SMUP0001        Sumatera        100.5.64.177
                     e.stopPropagation();
                     document.querySelectorAll('.poi-list li').forEach(l => l.classList.remove('active'));
                     li.classList.add('active');
-                    loadTopology(poi, region, null); // Kirim null untuk focusNode
+                    closeDashboard();
+                    loadTopology(poi, region, null);
                 };
                 poiList.appendChild(li);
             });
-
             header.onclick = () => {
                 header.classList.toggle('active');
                 poiList.classList.toggle('show');
             };
-            
             regionDiv.appendChild(header);
             regionDiv.appendChild(poiList);
             menuContainer.appendChild(regionDiv);
         });
+
+        // TAMBAHAN: Menu Dashboard di bawah list Region
+        const dashDiv = document.createElement('div');
+        dashDiv.className = 'region-item';
+        dashDiv.style.marginTop = '20px';
+        dashDiv.style.borderTop = '2px solid #2c3e50';
+        
+        const dashHeader = document.createElement('div');
+        dashHeader.className = 'region-header active';
+        dashHeader.style.background = '#2c3e50';
+        dashHeader.style.color = 'white';
+        dashHeader.innerHTML = '📊 Dashboard MW <span class="arrow">&#9660;</span>';
+        dashHeader.style.cursor = 'pointer';
+        
+        const dashList = document.createElement('ul');
+        dashList.className = 'poi-list show';
+        dashList.style.display = 'block';
+        dashList.style.background = '#fff';
+        
+        const menus = [
+            { name: 'Dashboard Utama', paket: 'Main', regions: [] },
+            { name: 'Paket 1 (Sumatera & Natuna)', paket: 'Paket 1', regions: ['Sumatera', 'Natuna'] },
+            { name: 'Paket 3 (NTT)', paket: 'Paket 3', regions: ['NTT'] },
+            { name: 'Paket 5 (Kalimantan)', paket: 'Paket 5', regions: ['Kalimantan'] },
+            { name: 'Paket 7 (Sulawesi)', paket: 'Paket 7', regions: ['Sulawesi'] },
+            { name: 'Paket 9 (Maluku)', paket: 'Paket 9', regions: ['Maluku'] }
+        ];
+        
+        menus.forEach(m => {
+            const li = document.createElement('li');
+            li.textContent = m.name;
+            li.style.borderLeft = 'none';
+            li.style.fontWeight = 'bold';
+            li.onclick = (e) => {
+                e.stopPropagation();
+                showDashboard(m.paket, m.regions);
+            };
+            dashList.appendChild(li);
+        });
+        
+        dashHeader.onclick = () => {
+            dashList.classList.toggle('show');
+            dashList.style.display = dashList.classList.contains('show') ? 'block' : 'none';
+        };
+        dashDiv.appendChild(dashHeader);
+        dashDiv.appendChild(dashList);
+        menuContainer.appendChild(dashDiv);
     }
     renderSidebar();
 
@@ -1444,43 +1445,22 @@ SMU00106-SMU00084        SMUP0001        Sumatera        100.5.64.177
     function searchSite() {
         const input = document.getElementById('siteSearch');
         const filter = input.value.toUpperCase().trim();
-        
-        // Jika kotak kosong, kembalikan sidebar ke normal
-        if (filter === "") {
-            renderSidebar();
-            return;
-        }
-
-        // Bersihkan sidebar dan ganti dengan hasil pencarian
+        if (filter === "") { renderSidebar(); return; }
         menuContainer.innerHTML = '<div class="search-info">Hasil Pencarian Site ID:</div>';
-        
-        // Cari node yang cocok
         let results = Object.keys(nodeData).filter(nodeId => nodeId.toUpperCase().includes(filter)).sort();
-        
-        if (results.length === 0) {
-            menuContainer.innerHTML += '<div class="no-result">Site ID tidak ditemukan</div>';
-            return;
-        }
-
+        if (results.length === 0) { menuContainer.innerHTML += '<div class="no-result">Site ID tidak ditemukan</div>'; return; }
         const resList = document.createElement('div');
         results.forEach(nodeId => {
             const item = document.createElement('div');
             item.className = 'search-result-item';
-            
             const poi = nodeToPoi[nodeId] || 'N/A';
             const region = nodeData[nodeId].region || 'N/A';
-            
-            item.innerHTML = `
-                <div class="search-result-title">${nodeId}</div>
-                <div class="search-result-sub">Region: ${region} | POI: ${poi}</div>
-            `;
-            
+            item.innerHTML = `<div class="search-result-title">${nodeId}</div><div class="search-result-sub">Region: ${region} | POI: ${poi}</div>`;
             item.onclick = () => {
-                // Bersihkan input & render ulang sidebar
                 document.getElementById('siteSearch').value = '';
                 renderSidebar();
-                
-                // Auto buka region dan highlight POI di sidebar
+                document.getElementById('dashboard-overlay').style.display = 'none';
+                document.getElementById('mynetwork').style.display = 'block';
                 const regionItems = document.querySelectorAll('.region-item');
                 regionItems.forEach(rItem => {
                     const headerEl = rItem.querySelector('.region-header');
@@ -1488,7 +1468,6 @@ SMU00106-SMU00084        SMUP0001        Sumatera        100.5.64.177
                         headerEl.classList.add('active');
                         const listEl = rItem.querySelector('.poi-list');
                         listEl.classList.add('show');
-                        
                         const poiLis = listEl.getElementsByTagName('li');
                         for(let li of poiLis) {
                             if (li.textContent === poi) {
@@ -1500,13 +1479,10 @@ SMU00106-SMU00084        SMUP0001        Sumatera        100.5.64.177
                         }
                     }
                 });
-                
-                // Load Topologi dan auto-focus ke node yang dicari
                 loadTopology(poi, region, nodeId);
             };
             resList.appendChild(item);
         });
-
         menuContainer.appendChild(resList);
     }
 
@@ -1514,8 +1490,6 @@ SMU00106-SMU00084        SMUP0001        Sumatera        100.5.64.177
     // 5. VISUALISASI TOPOLOGY
     // ---------------------------------------------------------
     const container = document.getElementById('mynetwork');
-
-    // Tambahkan parameter focusNode agar bisa auto-select & zoom ke node pencarian
     function loadTopology(rootPoi, currentRegion, focusNode = null) {
         const visited = new Set();
         const queue = [rootPoi];
@@ -1525,14 +1499,10 @@ SMU00106-SMU00084        SMUP0001        Sumatera        100.5.64.177
             const curr = queue[i++];
             if (graph[curr]) {
                 graph[curr].forEach(n => {
-                    if (!visited.has(n)) {
-                        visited.add(n);
-                        queue.push(n);
-                    }
+                    if (!visited.has(n)) { visited.add(n); queue.push(n); }
                 });
             }
         }
-
         const levels = {};
         const q = [{id: rootPoi, level: 0}];
         levels[rootPoi] = 0;
@@ -1548,16 +1518,13 @@ SMU00106-SMU00084        SMUP0001        Sumatera        100.5.64.177
                 });
             }
         }
-
         const nodes = [];
         const edges = [];
-        
         const getMetricStyle = (linkId) => {
             const linkPerf = performanceData[linkId];
             if (linkPerf) {
                 const start = document.getElementById('startDate').value;
                 const end = document.getElementById('endDate').value;
-                
                 const filtered = linkPerf.filter(d => {
                     if (!d.date) return false;
                     const dDate = new Date(d.date);
@@ -1565,55 +1532,42 @@ SMU00106-SMU00084        SMUP0001        Sumatera        100.5.64.177
                     const eDate = end ? new Date(end) : new Date();
                     return dDate >= sDate && dDate <= eDate;
                 });
-
                 if (filtered.length > 0) {
                     const validRsl = filtered.filter(d => !isNaN(d.rsl)).map(d => d.rsl);
-                    
                     if (validRsl.length > 0) {
                         const maxRsl = Math.max(...validRsl); 
-                        
                         let color = '#95a5a6';
                         if (maxRsl >= -3) { color = '#27ae60'; }
                         else if (maxRsl >= -6) { color = '#00bcd4'; }
                         else if (maxRsl >= -9) { color = '#f1c40f'; }
                         else if (maxRsl >= -10) { color = '#e74c3c'; }
-                        
                         return { color, width: 2, hasData: true, maxRsl };
                     }
                 }
             }
             return { color: '#aaa', width: 1.5, hasData: false };
         };
-
         visited.forEach(id => {
             const isMaster = (id === rootPoi);
             const lvl = levels[id] || 0;
             nodes.push({
-                id: id, label: id, level: lvl,
-                shape: 'box', 
+                id: id, label: id, level: lvl, shape: 'box', 
                 color: { background: isMaster ? '#ecf0f1' : '#fff', border: isMaster ? '#2c3e50' : '#34495e' },
                 font: { color: '#2c3e50', size: 12 }, borderWidth: 2, shadow: true, margin: isMaster ? 10 : 15,
                 title: `Node: ${id}`
             });
         });
-
         visited.forEach(id => {
             if (graph[id]) {
                 graph[id].forEach(neighbor => {
                     if (visited.has(neighbor) && id < neighbor) {
                         const linkId1 = `${id}-${neighbor}`;
                         const linkId2 = `${neighbor}-${id}`;
-                        
                         let style = getMetricStyle(linkId1);
                         if (!style.hasData) style = getMetricStyle(linkId2);
-
-                        // TAMBAHAN: Ambil IP Address untuk link ini (cek kedua arah)
                         let ipAddress = linkToIp[linkId1] || linkToIp[linkId2] || 'N/A';
                         edges.push({
-                            from: id, to: neighbor,
-                            dashes: false, 
-                            color: { color: style.color },
-                            width: style.width,
+                            from: id, to: neighbor, dashes: false, color: { color: style.color }, width: style.width,
                             smooth: { type: 'continuous' },
                             title: `Link: ${linkId1} | ${ipAddress}\nMax RSL: ${style.maxRsl ? style.maxRsl.toFixed(2) : 'N/A'} dBm`,
                             id: linkId1
@@ -1622,18 +1576,14 @@ SMU00106-SMU00084        SMUP0001        Sumatera        100.5.64.177
                 });
             }
         });
-
         const data = { nodes: new vis.DataSet(nodes), edges: new vis.DataSet(edges) };
         const options = {
             layout: { hierarchical: { enabled: true, direction: 'LR', sortMethod: 'directed', levelSeparation: 200, nodeSpacing: 150 } },
             interaction: { dragNodes: true, zoomView: true, dragView: true, navigationButtons: true, keyboard: true },
             physics: { enabled: false }, nodes: { borderWidth: 2 }
         };
-
         if (network) network.destroy();
         network = new vis.Network(container, data, options);
-        
-        // Auto Focus ke Node yang dicari (jika ada)
         if (focusNode) {
             network.once("afterDrawing", () => {
                 if (network.findNode(focusNode).length > 0) {
@@ -1643,7 +1593,6 @@ SMU00106-SMU00084        SMUP0001        Sumatera        100.5.64.177
                 }
             });
         }
-
         network.on("click", function (params) {
             if (params.nodes.length > 0) showNodeDetails(params.nodes[0]);
             else if (params.edges.length > 0) showLinkDetails(params.edges[0]);
@@ -1664,67 +1613,31 @@ SMU00106-SMU00084        SMUP0001        Sumatera        100.5.64.177
         destroyCharts();
         summaryContainer.innerHTML = '';
     }
-
     function createChartConfig(labels, data, label, color, isPercentage = false) {
         return {
             type: 'line',
-            data: {
-                labels: labels,
-                datasets: [{
-                    label: label,
-                    data: data,
-                    borderColor: color,
-                    backgroundColor: color + '20',
-                    borderWidth: 2, 
-                    fill: true, 
-                    tension: 0.1,
-                    pointBackgroundColor: color, 
-                    pointRadius: 3
-                }]
-            },
+            data: { labels: labels, datasets: [{ label: label, data: data, borderColor: color, backgroundColor: color + '20', borderWidth: 2, fill: true, tension: 0.1, pointBackgroundColor: color, pointRadius: 3 }] },
             plugins: [ChartDataLabels],
             options: {
-                responsive: true, 
-                maintainAspectRatio: false,
-                plugins: {
-                    legend: { display: false },
-                    datalabels: {
-                        display: true, color: '#333', align: 'top', offset: 2,
-                        font: { weight: 'bold', size: 9 },
-                        formatter: (value) => (value !== null && !isNaN(value)) ? value.toFixed(1) + (isPercentage ? '%' : '') : ''
-                    }
-                },
-                scales: {
-                    x: { display: true, ticks: { maxRotation: 45, minRotation: 45, font: { size: 8 } } },
-                    y: { display: true, title: { display: true, text: label, font: { size: 10 } }, ticks: { font: { size: 9 } } }
-                }
+                responsive: true, maintainAspectRatio: false,
+                plugins: { legend: { display: false }, datalabels: { display: true, color: '#333', align: 'top', offset: 2, font: { weight: 'bold', size: 9 }, formatter: (value) => (value !== null && !isNaN(value)) ? value.toFixed(1) + (isPercentage ? '%' : '') : '' } },
+                scales: { x: { display: true, ticks: { maxRotation: 45, minRotation: 45, font: { size: 8 } } }, y: { display: true, title: { display: true, text: label, font: { size: 10 } }, ticks: { font: { size: 9 } } } }
             }
         };
     }
-
-    function destroyCharts() {
-        chartInstances.forEach(chart => chart.destroy());
-        chartInstances = [];
-        chartsContainer.innerHTML = '';
-    }
-
+    function destroyCharts() { chartInstances.forEach(chart => chart.destroy()); chartInstances = []; chartsContainer.innerHTML = ''; }
     function showNodeDetails(nodeId) {
         detailPanel.classList.add('active');
         detailTitle.textContent = `Node: ${nodeId}`;
         destroyCharts();
         summaryContainer.innerHTML = `<div style="font-size:12px; color:#666; padding:10px;">Klik Link (garis) untuk melihat statistik.</div>`;
     }
-
     function showLinkDetails(edgeId) {
         detailPanel.classList.add('active');
-        // TAMBAHAN: Ambil IP Address dari map linkToIp
         let ipAddress = linkToIp[edgeId] || linkToIp[`${edgeId.split('-')[1]}-${edgeId.split('-')[0]}`] || 'N/A';
-        // Tampilkan IP Address di sebelah kanan Link:
         detailTitle.textContent = `Link: ${edgeId} | ${ipAddress}`;
         destroyCharts();
-
         const perf = performanceData[edgeId] || performanceData[`${edgeId.split('-')[1]}-${edgeId.split('-')[0]}`];
-        
         if (perf) {
             const start = document.getElementById('startDate').value;
             const end = document.getElementById('endDate').value;
@@ -1735,102 +1648,59 @@ SMU00106-SMU00084        SMUP0001        Sumatera        100.5.64.177
                 const eDate = end ? new Date(end) : new Date();
                 return dDate >= sDate && dDate <= eDate;
             });
-
-            // Calculate Stats dari 'filtered'
             const labels = filtered.map(d => d.date);
             const dlData = filtered.map(d => d.downlink);
             const maxDl = dlData.filter(v => !isNaN(v)).length ? Math.max(...dlData.filter(v => !isNaN(v))) : NaN;
-            
             const rslData = filtered.map(d => d.rsl);
             const maxRsl = rslData.filter(v => !isNaN(v)).length ? Math.max(...rslData.filter(v => !isNaN(v))) : NaN;
-            
             const capData = filtered.map(d => d.cap);
             const maxCap = capData.filter(v => !isNaN(v)).length ? Math.max(...capData.filter(v => !isNaN(v))) : NaN;
-            
             const availData = filtered.map(d => d.avail);
             const maxAvail = availData.filter(v => !isNaN(v)).length ? Math.max(...availData.filter(v => !isNaN(v))) : NaN;
-
-            // Ambil info statis dari array 'perf' (SEMUA DATA), bukan 'filtered'
             const staticInfoRec = perf.find(d => d.bandwidth && d.bandwidth !== 'N/A') || perf[0];
             const bwVal = staticInfoRec ? staticInfoRec.bandwidth : 'N/A';
             const modVal = staticInfoRec ? staticInfoRec.modulation : 'N/A';
             const confVal = staticInfoRec ? staticInfoRec.configuration : 'N/A';
-            
-            // Ambil Design Values dari 'perf' (Fixed)
             const rslDesignRec = perf.find(d => !isNaN(d.rslDesign)) || perf[0];
             const rslDesignVal = rslDesignRec ? rslDesignRec.rslDesign : NaN;
-
-            // FIX: Ambil Capacity Design dari 'perf'
             const capDesignRec = perf.find(d => !isNaN(d.capDesign)) || perf[0];
             const capDesignVal = capDesignRec ? capDesignRec.capDesign : NaN;
-
-            // RENDER SUMMARY
             summaryContainer.innerHTML = `
                 <div class="summary-box">
-                    <div class="summary-row">
-                        <span class="summary-label">RSL Design</span>
-                        <span class="summary-value">${!isNaN(rslDesignVal) ? rslDesignVal.toFixed(2) + ' dBm' : 'N/A'}</span>
-                    </div>
-                    <div class="summary-row">
-                        <span class="summary-label">Capacity Design</span>
-                        <span class="summary-value">${!isNaN(capDesignVal) ? capDesignVal.toFixed(2) + ' Mbps' : 'N/A'}</span>
-                    </div>
-                    <div class="summary-row">
-                        <span class="summary-label">Site Impacted</span>
-                        <span class="summary-value">${maxDl ? maxDl.toFixed(2) : 'N/A'} Sites</span>
-                    </div>
-                    <div class="summary-row">
-                        <span class="summary-label">Bandwidth</span>
-                        <span class="summary-value">${bwVal}</span>
-                    </div>
-                    <div class="summary-row">
-                        <span class="summary-label">Adaptive Modulation</span>
-                        <span class="summary-value">${modVal}</span>
-                    </div>
-                    <div class="summary-row">
-                        <span class="summary-label">Configuration</span>
-                        <span class="summary-value">${confVal}</span>
-                    </div>
+                    <div class="summary-row"><span class="summary-label">RSL Design</span><span class="summary-value">${!isNaN(rslDesignVal) ? rslDesignVal.toFixed(2) + ' dBm' : 'N/A'}</span></div>
+                    <div class="summary-row"><span class="summary-label">Capacity Design</span><span class="summary-value">${!isNaN(capDesignVal) ? capDesignVal.toFixed(2) + ' Mbps' : 'N/A'}</span></div>
+                    <div class="summary-row"><span class="summary-label">Site Impacted</span><span class="summary-value">${maxDl ? maxDl.toFixed(2) : 'N/A'} Sites</span></div>
+                    <div class="summary-row"><span class="summary-label">Bandwidth</span><span class="summary-value">${bwVal}</span></div>
+                    <div class="summary-row"><span class="summary-label">Adaptive Modulation</span><span class="summary-value">${modVal}</span></div>
+                    <div class="summary-row"><span class="summary-label">Configuration</span><span class="summary-value">${confVal}</span></div>
                 </div>
             `;
-
-            // Jika tidak ada data filter, tampilkan pesan di chart
             if (filtered.length === 0) {
                  chartsContainer.innerHTML = `<div style="color:#e74c3c; padding:10px; text-align:center;">No data for selected period.</div>`;
                  return;
             }
-
-            // Render Charts
             const rslBox = document.createElement('div');
             rslBox.className = 'chart-box';
             rslBox.innerHTML = `<div class="chart-title">Max RSL <span class="chart-value">${maxRsl ? maxRsl.toFixed(2) : 'N/A'} dBm</span></div><div style="height:100px;"><canvas id="chartRsl"></canvas></div>`;
             chartsContainer.appendChild(rslBox);
-            const ctxRsl = rslBox.querySelector('canvas').getContext('2d');
-            chartInstances.push(new Chart(ctxRsl, createChartConfig(labels, rslData, 'RSL (dBm)', '#3498db')));
-
+            chartInstances.push(new Chart(rslBox.querySelector('canvas').getContext('2d'), createChartConfig(labels, rslData, 'RSL (dBm)', '#3498db')));
             const capBox = document.createElement('div');
             capBox.className = 'chart-box';
             capBox.innerHTML = `<div class="chart-title">Max Capacity <span class="chart-value">${maxCap ? maxCap.toFixed(2) : 'N/A'} Mbps</span></div><div style="height:100px;"><canvas id="chartCap"></canvas></div>`;
             chartsContainer.appendChild(capBox);
-            const ctxCap = capBox.querySelector('canvas').getContext('2d');
-            chartInstances.push(new Chart(ctxCap, createChartConfig(labels, capData, 'Capacity (Mbps)', '#27ae60')));
-
+            chartInstances.push(new Chart(capBox.querySelector('canvas').getContext('2d'), createChartConfig(labels, capData, 'Capacity (Mbps)', '#27ae60')));
             const utilData = filtered.map(d => d.util);
             const maxUtil = utilData.filter(v => !isNaN(v)).length ? Math.max(...utilData.filter(v => !isNaN(v))) : NaN;
             const utilBox = document.createElement('div');
             utilBox.className = 'chart-box';
             utilBox.innerHTML = `<div class="chart-title">Max Utilization <span class="chart-value">${maxUtil ? maxUtil.toFixed(2) : 'N/A'} %</span></div><div style="height:100px;"><canvas id="chartUtil"></canvas></div>`;
             chartsContainer.appendChild(utilBox);
-            const ctxUtil = utilBox.querySelector('canvas').getContext('2d');
-            chartInstances.push(new Chart(ctxUtil, createChartConfig(labels, utilData, 'Utilization (%)', '#e67e22', true)));
-
+            chartInstances.push(new Chart(utilBox.querySelector('canvas').getContext('2d'), createChartConfig(labels, utilData, 'Utilization (%)', '#e67e22', true)));
             const availBox = document.createElement('div');
             availBox.className = 'chart-box';
             availBox.innerHTML = `<div class="chart-title">Max Availability <span class="chart-value">${maxAvail ? maxAvail.toFixed(3) : 'N/A'} %</span></div><div style="height:100px;"><canvas id="chartAvail"></canvas></div>`;
             chartsContainer.appendChild(availBox);
-            const ctxAvail = availBox.querySelector('canvas').getContext('2d');
-            chartInstances.push(new Chart(ctxAvail, createChartConfig(labels, availData, 'Availability (%)', '#9b59b6', true)));
-
+            chartInstances.push(new Chart(availBox.querySelector('canvas').getContext('2d'), createChartConfig(labels, availData, 'Availability (%)', '#9b59b6', true)));
         } else {
             summaryContainer.innerHTML = `<p style="color:#e74c3c; padding:10px;">No performance data found for this link.</p>`;
         }
@@ -1838,166 +1708,316 @@ SMU00106-SMU00084        SMUP0001        Sumatera        100.5.64.177
 
 // ============================================================
 // TAMBAHAN: Gambar Equipment IDU NEC & IP-20 per Region
-// Dipasang di atas RSL Design (summary-container)
 // ============================================================
 (function() {
     var EQUIP_IMAGES = {
         IDU_NEC: 'https://z-cdn-media.chatglm.cn/files/31180886-2fe3-467e-b51d-6df88a462e14.png?auth_key=1882875811-76b5d593d9234b0280c91b17cda1f2d0-0-6e460c28a36674fa4457ffc8c4205dd3',
         IP_20: 'https://z-cdn-media.chatglm.cn/files/95f4949f-0e78-41f4-96d8-a2a50486059b.png?auth_key=1882875811-9be3c28307c046108593b8855e2e854d-0-aab92349262f56ea5cd245af44c59102'
     };
-
     var IDU_NEC_REGIONS = ['Sulawesi', 'Natuna'];
     var IP20_REGIONS = ['Kalimantan', 'Sumatera', 'NTT', 'Maluku'];
-
-        // Bangun mapping node -> region dari rawData yang sudah ada
     var nodeRegionMap = {};
     rawData.trim().split('\n').forEach(function(line) {
         var parts = line.trim().split(/\s+/);
         if (parts.length >= 3) {
-            // Bagian link sekarang ada di parts[0] dan perlu dipisah oleh tanda "-"
-            var link = parts[0]; 
-            var region = parts[2]; // Region sekarang ada di index ke-2 (tetap)
-            
+            var link = parts[0]; var region = parts[2]; 
             var dashIdx = link.indexOf('-');
             if (dashIdx !== -1) {
                 var node1 = link.substring(0, dashIdx);
                 var node2 = link.substring(dashIdx + 1);
-                
                 if (!nodeRegionMap[node1]) nodeRegionMap[node1] = region;
                 if (!nodeRegionMap[node2]) nodeRegionMap[node2] = region;
             }
         }
     });
-
-    // Cari node ID dari teks judul detail panel
     function getNodeFromTitle(titleText) {
         if (!titleText) return null;
         var keys = Object.keys(nodeRegionMap).sort(function(a, b) { return b.length - a.length; });
-        for (var i = 0; i < keys.length; i++) {
-            if (titleText.indexOf(keys[i]) !== -1) return keys[i];
-        }
+        for (var i = 0; i < keys.length; i++) { if (titleText.indexOf(keys[i]) !== -1) return keys[i]; }
         return null;
     }
-
-    // Sisipkan gambar equipment di atas summary-container
     function injectEquipmentImage() {
         var panel = document.getElementById('detail-panel');
         if (!panel.classList.contains('active')) return;
-
         var titleText = document.getElementById('detail-title').textContent;
         var nodeId = getNodeFromTitle(titleText);
         if (!nodeId) return;
-
         var summaryContainer = document.getElementById('summary-container');
-
-        // Hapus gambar lama jika ada (saat ganti node)
         var existingImg = document.getElementById('equip-image-container');
         if (existingImg) existingImg.remove();
-
         var region = nodeRegionMap[nodeId];
         if (!region) return;
-
-        var imageUrl = null;
-        var imageLabel = '';
-        if (IDU_NEC_REGIONS.indexOf(region) !== -1) {
-            imageUrl = EQUIP_IMAGES.IDU_NEC;
-            imageLabel = 'IDU NEC';
-        } else if (IP20_REGIONS.indexOf(region) !== -1) {
-            imageUrl = EQUIP_IMAGES.IP_20;
-            imageLabel = 'IP-20S/C';
-        }
-
+        var imageUrl = null; var imageLabel = '';
+        if (IDU_NEC_REGIONS.indexOf(region) !== -1) { imageUrl = EQUIP_IMAGES.IDU_NEC; imageLabel = 'IDU NEC'; } 
+        else if (IP20_REGIONS.indexOf(region) !== -1) { imageUrl = EQUIP_IMAGES.IP_20; imageLabel = 'IP-20S/C'; }
         if (imageUrl) {
             var imgContainer = document.createElement('div');
             imgContainer.id = 'equip-image-container';
-            imgContainer.innerHTML =
-                '<div class="equip-label">Equipment: ' + imageLabel + ' (' + region + ')</div>' +
-                '<img src="' + imageUrl + '" alt="' + imageLabel + '">';
-            // Disisipkan tepat di atas summary-container (di atas RSL Design)
+            imgContainer.innerHTML = '<div class="equip-label">Equipment: ' + imageLabel + ' (' + region + ')</div><img src="' + imageUrl + '" alt="' + imageLabel + '">';
             summaryContainer.parentNode.insertBefore(imgContainer, summaryContainer);
         }
     }
-
-    // Hapus gambar saat panel ditutup
-    function removeEquipmentImage() {
-        var existingImg = document.getElementById('equip-image-container');
-        if (existingImg) existingImg.remove();
-    }
-
-    // Observer 1: Pantau buka/tutupnya detail panel via class 'active'
+    function removeEquipmentImage() { var existingImg = document.getElementById('equip-image-container'); if (existingImg) existingImg.remove(); }
     var detailPanelEl = document.getElementById('detail-panel');
     var panelClassObserver = new MutationObserver(function(mutations) {
         mutations.forEach(function(mutation) {
             if (mutation.attributeName === 'class') {
-                if (detailPanelEl.classList.contains('active')) {
-                    setTimeout(injectEquipmentImage, 80);
-                } else {
-                    removeEquipmentImage();
-                }
+                if (detailPanelEl.classList.contains('active')) { setTimeout(injectEquipmentImage, 80); } 
+                else { removeEquipmentImage(); }
             }
         });
     });
     panelClassObserver.observe(detailPanelEl, { attributes: true, attributeFilter: ['class'] });
-
-    // Observer 2: Pantau perubahan judul (saat pindah node tanpa tutup panel)
     var titleEl = document.getElementById('detail-title');
-    var titleObserver = new MutationObserver(function() {
-        if (detailPanelEl.classList.contains('active')) {
-            injectEquipmentImage();
-        }
-    });
+    var titleObserver = new MutationObserver(function() { if (detailPanelEl.classList.contains('active')) { injectEquipmentImage(); } });
     titleObserver.observe(titleEl, { childList: true, characterData: true, subtree: true });
 })();
 
 // ==========================================================
 // TAMBAHAN: AUTO-FETCH DATA DARI GOOGLE SHEETS (GOOGLE DRIVE)
-// Kode ini menarik file .xlsx langsung dari Google Sheets
 // ==========================================================
 (function() {
     async function loadFromGoogleSheets() {
-        // Ekstrak ID Spreadsheet dan GID dari URL Google Sheets Anda
         const sheetId = '19cFmUtA_BP16Cgck4-25avMAyxlMuDJQrxITgEDE7jQ';
         const gid = '720718926';
-        
-        // URL ini akan meminta Google Sheets untuk mengekspor sheet tersebut sebagai file .xlsx
         const googleSheetExportUrl = `https://docs.google.com/spreadsheets/d/${sheetId}/export?format=xlsx&gid=${gid}`;
-        
         try {
-            console.log("Memuat data otomatis dari Google Sheets...");
             const response = await fetch(googleSheetExportUrl);
-            
-            if (!response.ok) {
-                throw new Error('Gagal mengunduh file (Status: ' + response.status + ')');
-            }
-            
-            // Ubah response menjadi Blob (file binary)
+            if (!response.ok) throw new Error('Gagal mengunduh file (Status: ' + response.status + ')');
             const blob = await response.blob();
-            
-            // Buat objek File dari blob agar bisa dimasukkan ke input file
             const fileName = "Data Performa Google Sheets.xlsx";
             const file = new File([blob], fileName, { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
-            
-            // Masukkan file hasil fetch ke dalam elemen input file HTML
             const dataTransfer = new DataTransfer();
             dataTransfer.items.add(file);
             const fileInput = document.getElementById('fileInput');
             fileInput.files = dataTransfer.files;
-            
-            // Trigger event 'change' secara buatan agar script parser XLSX otomatis jalan
             const event = new Event('change', { bubbles: true });
             fileInput.dispatchEvent(event);
-            
-            console.log("Data Google Sheets berhasil dimuat!");
-            
         } catch (error) {
             console.error('Error loading Google Sheets data:', error);
             alert('Gagal memuat data otomatis dari Google Sheets. Pastikan izin akses spreadsheet adalah "Anyone with the link".\nAnda masih bisa upload manual. \nDetail Error: ' + error.message);
         }
     }
-
-    // Jalankan fungsi fetch otomatis saat halaman selesai dimuat
     window.addEventListener('load', loadFromGoogleSheets);
 })();
+
+// ==========================================================
+// LOGIKA DASHBOARD MW
+// ==========================================================
+let currentDashPaket = 'Main';
+let currentDashRegions = [];
+let dashCharts = [];
+
+function getWeekNumber(d) {
+    d = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+    d.setUTCDate(d.getUTCDate() + 4 - (d.getUTCDay()||7));
+    var yearStart = new Date(Date.UTC(d.getUTCFullYear(),0,1));
+    var weekNo = Math.ceil((((d - yearStart) / 86400000) + 1)/7);
+    return weekNo;
+}
+
+function showDashboard(paket, regions = []) {
+    currentDashPaket = paket;
+    currentDashRegions = regions;
+    document.getElementById('mynetwork').style.display = 'none';
+    document.getElementById('detail-panel').classList.remove('active');
+    document.getElementById('dashboard-overlay').style.display = 'block';
+    const dashContent = document.getElementById('dashboard-content');
+    dashContent.innerHTML = '';
+    destroyDashCharts();
+    const startVal = document.getElementById('dashStartDate').value;
+    const endVal = document.getElementById('dashEndDate').value;
+    const sDate = startVal ? new Date(startVal) : new Date(Date.now() - 6 * 24 * 60 * 60 * 1000);
+    const eDate = endVal ? new Date(endVal) : new Date();
+    document.getElementById('dashStartDate').value = sDate.toISOString().split('T')[0];
+    document.getElementById('dashEndDate').value = eDate.toISOString().split('T')[0];
+    const sStr = sDate.toISOString().split('T')[0];
+    const eStr = eDate.toISOString().split('T')[0];
+    document.getElementById('dashboard-title').textContent = `Dashboard MW - ${paket}`;
+    document.getElementById('week-info').textContent = `Periode: ${sStr} s/d ${eStr} (Week ${getWeekNumber(eDate)})`;
+    if (paket === 'Main') { renderMainDashboard(sDate, eDate); } 
+    else { renderRegionDashboard(paket, regions, sDate, eDate); }
+}
+
+function closeDashboard() {
+    document.getElementById('mynetwork').style.display = 'block';
+    document.getElementById('dashboard-overlay').style.display = 'none';
+    destroyDashCharts();
+}
+
+function destroyDashCharts() { dashCharts.forEach(c => c.destroy()); dashCharts = []; }
+
+function renderMainDashboard(sDate, eDate) {
+    const content = document.getElementById('dashboard-content');
+    let totalPoi = Object.keys(poiToNodes).length;
+    let totalLinks = 0;
+    let rslCat = { 'Optimal': 0, 'Minor': 0, 'Observes': 0, 'Action TS': 0 };
+    let totalCapDesign = 0, totalCapActual = 0, sumUtil = 0, utilCount = 0;
+    const uniqueLinks = new Set();
+    Object.keys(linkToIp).forEach(link => {
+        const p = link.split('-');
+        uniqueLinks.add(p[0] < p[1] ? `${p[0]}-${p[1]}` : `${p[1]}-${p[0]}`);
+    });
+    totalLinks = uniqueLinks.size;
+    uniqueLinks.forEach(linkId => {
+        const perf = performanceData[linkId] || performanceData[`${linkId.split('-')[1]}-${linkId.split('-')[0]}`];
+        if (perf) {
+            const filtered = perf.filter(d => {
+                if(!d.date) return false;
+                const dDate = new Date(d.date);
+                return dDate >= sDate && dDate <= eDate;
+            });
+            if (filtered.length > 0) {
+                const validRsl = filtered.filter(d => !isNaN(d.rsl)).map(d => d.rsl);
+                if (validRsl.length > 0) {
+                    const maxRsl = Math.max(...validRsl);
+                    if (maxRsl >= -3) rslCat['Optimal']++;
+                    else if (maxRsl >= -6) rslCat['Minor']++;
+                    else if (maxRsl >= -10) rslCat['Observes']++;
+                    else rslCat['Action TS']++;
+                }
+                const validCap = filtered.filter(d => !isNaN(d.cap)).map(d => d.cap);
+                if (validCap.length > 0) totalCapActual += Math.max(...validCap);
+                const validUtil = filtered.filter(d => !isNaN(d.util)).map(d => d.util);
+                if (validUtil.length > 0) { sumUtil += Math.max(...validUtil); utilCount++; }
+            }
+            const capDesignRec = perf.find(d => !isNaN(d.capDesign));
+            if (capDesignRec) totalCapDesign += capDesignRec.capDesign;
+        }
+    });
+    const avgUtil = utilCount > 0 ? sumUtil / utilCount : 0;
+    content.innerHTML += `
+        <div class="dash-card">
+            <h3>Summary Total</h3>
+            <div class="dash-stat-row">
+                <div class="dash-stat-item"><div class="val">${totalPoi}</div><div class="lbl">Total POI</div></div>
+                <div class="dash-stat-item"><div class="val">${totalLinks}</div><div class="lbl">Total Link</div></div>
+            </div>
+        </div>
+    `;
+    content.innerHTML += `
+        <div class="dash-card">
+            <h3>Total Performance RSL</h3>
+            <div class="dash-chart-container"><canvas id="dashRslChart"></canvas></div>
+        </div>
+    `;
+    dashCharts.push(new Chart(document.getElementById('dashRslChart').getContext('2d'), {
+        type: 'doughnut',
+        data: { labels: Object.keys(rslCat), datasets: [{ data: Object.values(rslCat), backgroundColor: ['#27ae60', '#00bcd4', '#f1c40f', '#e74c3c'] }] },
+        options: { plugins: { datalabels: { color: '#fff', font: { weight: 'bold' }, formatter: (v) => v > 0 ? v : '' } }, legend: { position: 'bottom' } } }
+    }));
+    content.innerHTML += `
+        <div class="dash-card">
+            <h3>Capacity Design vs Actual & Utilization</h3>
+            <div class="dash-chart-container"><canvas id="dashCapChart"></canvas></div>
+        </div>
+    `;
+    dashCharts.push(new Chart(document.getElementById('dashCapChart').getContext('2d'), {
+        type: 'bar',
+        data: { labels: ['Total'], datasets: [
+            { label: 'Cap Design (Mbps)', data: [totalCapDesign], backgroundColor: '#3498db', yAxisID: 'y' },
+            { label: 'Cap Actual (Mbps)', data: [totalCapActual], backgroundColor: '#27ae60', yAxisID: 'y' },
+            { label: 'Utilization (%)', data: [avgUtil], type: 'line', borderColor: '#e74c3c', backgroundColor: '#e74c3c', yAxisID: 'y1', tension: 0.1 }
+        ]},
+        options: { scales: { y: { position: 'left', title: { display: true, text: 'Mbps' } }, y1: { position: 'right', title: { display: true, text: '%' }, grid: { drawOnChartArea: false }, min: 0, max: 100 } }, plugins: { datalabels: { anchor: 'end', align: 'top', font: { size: 10 } } } }
+    }));
+}
+
+function renderRegionDashboard(paket, regions, sDate, eDate) {
+    const content = document.getElementById('dashboard-content');
+    let totalPoi = 0, totalLinks = 0;
+    let poiData = {};
+    regions.forEach(r => {
+        if (regionMap[r]) {
+            totalPoi += regionMap[r].size;
+            regionMap[r].forEach(p => { poiData[p] = { maxUtil: [], aveUtil: [], capDesign: 0, capActual: 0 }; });
+        }
+    });
+    const uniqueLinks = new Set();
+    Object.keys(linkToIp).forEach(link => {
+        const p = link.split('-');
+        uniqueLinks.add(p[0] < p[1] ? `${p[0]}-${p[1]}` : `${p[1]}-${p[0]}`);
+    });
+    uniqueLinks.forEach(linkId => {
+        const [id1, id2] = linkId.split('-');
+        const poi1 = nodeToPoi[id1], poi2 = nodeToPoi[id2];
+        const reg1 = nodeData[id1] ? nodeData[id1].region : null;
+        const reg2 = nodeData[id2] ? nodeData[id2].region : null;
+        if (regions.includes(reg1) || regions.includes(reg2)) {
+            totalLinks++;
+            const perf = performanceData[linkId] || performanceData[`${id2}-${id1}`];
+            if (perf) {
+                const filtered = perf.filter(d => {
+                    if(!d.date) return false;
+                    const dDate = new Date(d.date);
+                    return dDate >= sDate && dDate <= eDate;
+                });
+                let linkMaxUtil = NaN, linkAveUtil = NaN, linkCapDesign = NaN, linkCapActual = NaN;
+                if (filtered.length > 0) {
+                    const validUtil = filtered.filter(d => !isNaN(d.util)).map(d => d.util);
+                    if (validUtil.length > 0) {
+                        linkMaxUtil = Math.max(...validUtil);
+                        linkAveUtil = validUtil.reduce((a,b) => a+b, 0) / validUtil.length;
+                    }
+                    const validCap = filtered.filter(d => !isNaN(d.cap)).map(d => d.cap);
+                    if (validCap.length > 0) linkCapActual = Math.max(...validCap);
+                }
+                const capDesignRec = perf.find(d => !isNaN(d.capDesign));
+                if (capDesignRec) linkCapDesign = capDesignRec.capDesign;
+                [poi1, poi2].forEach(p => {
+                    if (poiData[p]) {
+                        if (!isNaN(linkMaxUtil)) poiData[p].maxUtil.push(linkMaxUtil);
+                        if (!isNaN(linkAveUtil)) poiData[p].aveUtil.push(linkAveUtil);
+                        if (!isNaN(linkCapDesign)) poiData[p].capDesign += linkCapDesign;
+                        if (!isNaN(linkCapActual)) poiData[p].capActual += linkCapActual;
+                    }
+                });
+            }
+        }
+    });
+    const poiNames = Object.keys(poiData);
+    const maxUtilData = poiNames.map(p => poiData[p].maxUtil.length ? Math.max(...poiData[p].maxUtil) : 0);
+    const aveUtilData = poiNames.map(p => poiData[p].aveUtil.length ? (poiData[p].aveUtil.reduce((a,b)=>a+b,0)/poiData[p].aveUtil.length) : 0);
+    const capDesData = poiNames.map(p => poiData[p].capDesign);
+    const capActData = poiNames.map(p => poiData[p].capActual);
+    content.innerHTML += `
+        <div class="dash-card">
+            <h3>Summary ${paket}</h3>
+            <div class="dash-stat-row">
+                <div class="dash-stat-item"><div class="val">${totalPoi}</div><div class="lbl">Total POI</div></div>
+                <div class="dash-stat-item"><div class="val">${totalLinks}</div><div class="lbl">Total Link</div></div>
+            </div>
+        </div>
+    `;
+    content.innerHTML += `
+        <div class="dash-card">
+            <h3>Total Utilization Capacity Usage (%)</h3>
+            <div class="dash-chart-container"><canvas id="dashUtilChart"></canvas></div>
+        </div>
+    `;
+    dashCharts.push(new Chart(document.getElementById('dashUtilChart').getContext('2d'), {
+        type: 'bar',
+        data: { labels: poiNames, datasets: [
+            { label: 'Max Util (%)', data: maxUtilData, backgroundColor: '#3498db' },
+            { label: 'Ave Util (%)', data: aveUtilData, backgroundColor: '#95a5a6' }
+        ]},
+        options: { scales: { y: { min: 0, max: 100 } }, plugins: { datalabels: { anchor: 'end', align: 'top', font: { size: 9 }, formatter: (v) => v > 0 ? v.toFixed(1)+'%' : '' } }, legend: { position: 'bottom' } } }
+    }));
+    content.innerHTML += `
+        <div class="dash-card">
+            <h3>Total Capacity Design vs Usage Capacity</h3>
+            <div class="dash-chart-container"><canvas id="dashCapSumChart"></canvas></div>
+        </div>
+    `;
+    dashCharts.push(new Chart(document.getElementById('dashCapSumChart').getContext('2d'), {
+        type: 'bar',
+        data: { labels: poiNames, datasets: [
+            { label: 'Cap Design (Mbps)', data: capDesData, backgroundColor: '#3498db' },
+            { label: 'Cap Actual (Mbps)', data: capActData, backgroundColor: '#27ae60' }
+        ]},
+        options: { plugins: { datalabels: { anchor: 'end', align: 'top', font: { size: 9 }, formatter: (v) => v > 0 ? v.toFixed(0) : '' } }, legend: { position: 'bottom' } } }
+    }));
+}
 
 </script>
 
